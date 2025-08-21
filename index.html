@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>REEL C - Console Anni '70</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="container">
+    <canvas id="gameCanvas" width="640" height="480"></canvas>
+  </div>
+
+  <div id="menu" class="screen">
+    <h1>REEL C - CONSOLE 1978</h1>
+    <p>Seleziona un gioco:</p>
+    <button onclick="startGame('tennis')">1. TENNIS</button>
+    <button onclick="startGame('calcio')">2. CALCIO</button>
+    <button onclick="startGame('pelota')">3. PELOTA</button>
+    <button onclick="startGame('squash')">4. SQUASH</button>
+    <p>Risoluzione: 
+      <select id="resolution" onchange="changeResolution()">
+        <option value="1">Base (640x480)</option>
+        <option value="1.6">+60%</option>
+        <option value="2">Fullscreen (98%)</option>
+      </select>
+    </p>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
