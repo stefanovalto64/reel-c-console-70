@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>REEL C - Console Anni '70</title>
   <style>
-    body {
+    body, html {
       margin: 0;
+      padding: 0;
       background: #000;
       display: flex;
       justify-content: center;
@@ -14,13 +15,14 @@
       min-height: 100vh;
       font-family: 'Courier New', monospace;
       color: white;
-      flex-direction: column;
       overflow: hidden;
     }
     canvas {
       border: 4px solid #0f0;
       image-rendering: pixelated;
       box-shadow: 0 0 20px rgba(0, 255, 0, 0.4);
+      max-width: 98vw;
+      max-height: 98vh;
     }
     .container { text-align: center; }
     .scanlines {
@@ -29,14 +31,25 @@
       pointer-events: none;
       opacity: 0.15;
     }
-    @media (max-width: 700px) {
-      canvas { width: 90vw; height: auto; }
+    .fullscreen-btn {
+      margin-top: 10px;
+      padding: 8px 16px;
+      background: #0f0;
+      color: #000;
+      border: none;
+      font-family: 'Courier New', monospace;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .fullscreen-btn:hover {
+      background: #00ff00cc;
     }
   </style>
 </head>
 <body>
   <div class="container">
     <canvas id="gameCanvas" width="640" height="480"></canvas>
+    <button class="fullscreen-btn" onclick="enterFullscreen()">FULLSCREEN</button>
     <div id="menu">
       <h2>REEL C - CONSOLE 1978</h2>
       <p>1. TENNIS | 2. CALCIO | 3. PELOTA | 4. SQUASH</p>
@@ -46,31 +59,22 @@
   <div class="scanlines" id="scanlines"></div>
 
   <script>
-    // ========================================
-    // Reel C - Console Anni '70 (Web Version)
-    // Basato sulla versione aggiornata di Geppetto64
-    // ========================================
-
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const scanlines = document.getElementById('scanlines');
     const WIDTH = canvas.width;
     const HEIGHT = canvas.height;
 
-    // Colori
     const BLACK = '#000000';
     const GREEN = '#00FF00';
     const WHITE = '#FFFFFF';
     const YELLOW = '#FFFF00';
     const ORANGE = '#FFA500';
 
-    // Font
     const FONT = '16px monospace';
     const SCORE_FONT = '76px monospace';
     const VICTORY_FONT = '100px monospace';
-    const GOAL_FONT = '140px monospace';
 
-    // Audio Context
     let audioCtx;
     function initAudio() {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -100,7 +104,6 @@
       [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => playTone(f, 0.15), i * 150));
     }
 
-    // Effetto CRT (scanlines)
     function createScanlines() {
       let lines = '';
       for (let y = 0; y < HEIGHT; y += 2) {
@@ -110,12 +113,18 @@
     }
     createScanlines();
 
-    // Gestione tasti
+    function enterFullscreen() {
+      if (canvas.requestFullscreen) {
+        canvas.requestFullscreen();
+      } else if (canvas.webkitRequestFullscreen) {
+        canvas.webkitRequestFullscreen();
+      }
+    }
+
     const keys = {};
     window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
     window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-    // Classi dei giochi (es. Tennis con pausa e set)
     class Game {
       constructor() {
         this.running = true;
@@ -136,10 +145,11 @@
           this.draw();
           this.lastTime = timestamp;
         }
-        requestAnimationFrame((t) => this.run(t));
+        requestAnimationFrame(t => this.run(t));
       }
     }
 
+    // ================== TENNIS ==================
     class Tennis extends Game {
       constructor() {
         super();
@@ -161,13 +171,7 @@
         this.paused = false;
         this.showLevelMsg = false;
         this.levelMsgTime = 0;
-        this.ball = {
-          x: WIDTH / 2,
-          y: HEIGHT / 2,
-          speedX: 0,
-          speedY: 0,
-          radius: 6
-        };
+        this.ball = { x: WIDTH / 2, y: HEIGHT / 2, speedX: 0, speedY: 0, radius: 6 };
         this.reset();
       }
       reset() {
@@ -241,6 +245,8 @@
         if (this.paused) {
           ctx.fillStyle = ORANGE;
           ctx.fillText("GIOCO IN PAUSA", WIDTH / 2 - 70, HEIGHT / 2);
+          ctx.fillStyle = WHITE;
+          ctx.fillText("Premere P per riprendere", WIDTH / 2 - 100, HEIGHT / 2 + 30);
         }
       }
       update() {
@@ -344,7 +350,637 @@
       }
     }
 
-    // Funzioni di menu
+    // ================== CALCIO ==================
+    class Soccer extends Game {
+      constructor() {
+        super();
+        this.playerWidth = 10;
+        this.playerHeight = 30;
+        this.speed = 6;
+        this.goalWidth = 160;
+        this.player1Y = HEIGHT / 2 - this.playerHeight / 2;
+        this.player2Y = HEIGHT / 2 - this.playerHeight / 2;
+        this.lastHitter = null;
+        this.ballSpeedMultiplier = 1.0;
+        this.gameOver = false;
+        this.winner = null;
+        this.victoryPlayed = false;
+        this.waitingStart = true;
+        this.showStarterMsg = false;
+        this.starter = null;
+        this.goalMode = false;
+        this.goalTimer = 0;
+        this.ball = { x: WIDTH / 2, y: HEIGHT / 2, speedX: 0, speedY: 0, radius: 12 };
+        this.reset();
+      }
+      reset() {
+        const base = 4;
+        const mag = base * this.ballSpeedMultiplier;
+        this.ball.speedX = Math.random() > 0.5 ? -mag : mag;
+        this.ball.speedY = Math.random() > 0.5 ? -mag : mag;
+        this.ball.x = WIDTH / 2;
+        this.ball.y = HEIGHT / 2;
+        this.lastHitter = null;
+      }
+      drawSoccerField() {
+        ctx.strokeStyle = WHITE;
+        ctx.lineWidth = 4;
+        ctx.strokeRect(0, 0, WIDTH, HEIGHT);
+        ctx.beginPath();
+        ctx.moveTo(WIDTH / 2, 0);
+        ctx.lineTo(WIDTH / 2, HEIGHT);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(WIDTH / 2, HEIGHT / 2, HEIGHT * 0.15, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillRect(WIDTH / 2 - 4, HEIGHT / 2 - 4, 8, 8);
+        const penaltyWidth = WIDTH * 0.125;
+        const penaltyHeight = HEIGHT * 0.45;
+        ctx.strokeRect(0, (HEIGHT - penaltyHeight) / 2, penaltyWidth, penaltyHeight);
+        ctx.strokeRect(WIDTH - penaltyWidth, (HEIGHT - penaltyHeight) / 2, penaltyWidth, penaltyHeight);
+        ctx.fillRect(WIDTH * 0.1, HEIGHT / 2 - 4, 8, 8);
+        ctx.fillRect(WIDTH * 0.9, HEIGHT / 2 - 4, 8, 8);
+        const arcR = HEIGHT * 0.1;
+        ctx.beginPath();
+        ctx.arc(WIDTH * 0.1, HEIGHT / 2, arcR, -Math.PI / 2.8, Math.PI / 2.8);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(WIDTH * 0.9, HEIGHT / 2, arcR, Math.PI - Math.PI / 2.8, Math.PI + Math.PI / 2.8);
+        ctx.stroke();
+        const cr = WIDTH * 0.05;
+        [[0,0], [WIDTH,0], [0,HEIGHT], [WIDTH,HEIGHT]].forEach(([x,y]) => {
+          ctx.beginPath();
+          ctx.arc(x, y, cr, 0, Math.PI * 2);
+          ctx.stroke();
+        });
+      }
+      draw() {
+        ctx.fillStyle = BLACK;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        this.drawSoccerField();
+        ctx.strokeStyle = GREEN;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(0, HEIGHT/2 - this.goalWidth/2, 20, this.goalWidth);
+        ctx.strokeStyle = WHITE;
+        ctx.strokeRect(WIDTH - 20, HEIGHT/2 - this.goalWidth/2, 20, this.goalWidth);
+        ctx.fillStyle = GREEN;
+        ctx.fillRect(30, this.player1Y, this.playerWidth, this.playerHeight);
+        ctx.fillStyle = WHITE;
+        ctx.fillRect(WIDTH - 30 - this.playerWidth, this.player2Y, this.playerWidth, this.playerHeight);
+        ctx.fillStyle = WHITE;
+        ctx.beginPath();
+        ctx.arc(this.ball.x, this.ball.y, this.ball.radius, 0, Math.PI * 2);
+        ctx.fill();
+        this.drawScoreboard();
+        const level = Math.floor(this.ballSpeedMultiplier / 1.05) + 1;
+        ctx.font = FONT;
+        ctx.fillStyle = YELLOW;
+        ctx.fillText(`LIV: ${level}`, WIDTH - 100, 10);
+        if (this.waitingStart) {
+          ctx.fillStyle = YELLOW;
+          ctx.fillText("Premere G per iniziare gioco", WIDTH / 2 - 120, 90);
+          ctx.fillStyle = ORANGE;
+          ctx.fillText("Premere P per pausa gioco e ripremere P per continuare", WIDTH / 2 - 220, 120);
+          if (this.showStarterMsg) {
+            const col = this.starter === 'p1' ? GREEN : WHITE;
+            const txt = this.starter === 'p1' ? "VERDE" : "BIANCO";
+            ctx.fillStyle = col;
+            ctx.fillText(`Inizia il giocatore: ${txt}`, WIDTH / 2 - 100, 150);
+          }
+        }
+        if (this.goalMode) {
+          ctx.fillStyle = YELLOW;
+          ctx.font = GOAL_FONT;
+          const goal = ctx.measureText("GOAL!");
+          ctx.fillText("GOAL!", (WIDTH - goal.width) / 2, HEIGHT / 2);
+          ctx.font = FONT;
+          const playerText = this.lastHitter === 'p1' ?
+            "Il giocatore VERDE ha segnato!" :
+            "Il giocatore BIANCO ha segnato!";
+          const pt = ctx.measureText(playerText);
+          ctx.fillStyle = this.lastHitter === 'p1' ? GREEN : WHITE;
+          ctx.fillText(playerText, (WIDTH - pt.width) / 2, HEIGHT / 2 + 80);
+        }
+        if (this.gameOver) {
+          ctx.fillStyle = this.winner === "VERDE" ? GREEN : WHITE;
+          ctx.font = FONT;
+          const win = ctx.measureText(`VITTORIA: ${this.winner}`);
+          ctx.fillText(`VITTORIA: ${this.winner}`, (WIDTH - win.width) / 2, HEIGHT / 2 - 40);
+          const cont = ctx.measureText("ESC per uscire");
+          ctx.fillStyle = WHITE;
+          ctx.fillText("ESC per uscire", (WIDTH - cont.width) / 2, HEIGHT / 2 + 10);
+        }
+      }
+      update() {
+        if (this.gameOver || this.waitingStart || this.paused || this.goalMode) {
+          if (this.goalMode) {
+            this.goalTimer--;
+            if (this.goalTimer <= 0) {
+              this.goalMode = false;
+              this.reset();
+            }
+          }
+          return;
+        }
+
+        this.ball.x += this.ball.speedX;
+        this.ball.y += this.ball.speedY;
+
+        if (this.ball.y <= 0 || this.ball.y >= HEIGHT) {
+          this.ball.speedY *= -1;
+          playWallBounce();
+        }
+
+        const p1Rect = { x: 10, y: this.player1Y, w: this.playerWidth, h: this.playerHeight };
+        const p2Rect = { x: WIDTH - 30 - this.playerWidth, y: this.player2Y, w: this.playerWidth, h: this.playerHeight };
+        const bRect = { x: this.ball.x - 12, y: this.ball.y - 12, w: 24, h: 24 };
+
+        if (this.collision(p1Rect, bRect)) {
+          this.ball.speedX *= -1.1;
+          this.lastHitter = 'p1';
+          playPaddleHit();
+        }
+        if (this.collision(p2Rect, bRect)) {
+          this.ball.speedX *= -1.1;
+          this.lastHitter = 'p2';
+          playPaddleHit();
+        }
+
+        if (this.ball.x < 20 && HEIGHT/2 - this.goalWidth/2 < this.ball.y && this.ball.y < HEIGHT/2 + this.goalWidth/2) {
+          this.scoreP2 += 5;
+          this.ballSpeedMultiplier *= 1.05;
+          playGoalSound();
+          this.goalMode = true;
+          this.goalTimer = 48;
+          this.lastHitter = 'p2';
+          return;
+        }
+        if (this.ball.x > WIDTH - 20 && HEIGHT/2 - this.goalWidth/2 < this.ball.y && this.ball.y < HEIGHT/2 + this.goalWidth/2) {
+          this.scoreP1 += 5;
+          this.ballSpeedMultiplier *= 1.05;
+          playGoalSound();
+          this.goalMode = true;
+          this.goalTimer = 48;
+          this.lastHitter = 'p1';
+          return;
+        }
+
+        if (this.ball.x > WIDTH && this.lastHitter === 'p1') {
+          this.scoreP1 += 1;
+          playPointScore();
+          this.reset();
+          return;
+        }
+        if (this.ball.x < 0 && this.lastHitter === 'p2') {
+          this.scoreP2 += 1;
+          playPointScore();
+          this.reset();
+          return;
+        }
+
+        if (this.scoreP1 >= 100) {
+          this.gameOver = true;
+          this.winner = "VERDE";
+          if (!this.victoryPlayed) {
+            playVictoryJingle();
+            this.victoryPlayed = true;
+          }
+        } else if (this.scoreP2 >= 100) {
+          this.gameOver = true;
+          this.winner = "BIANCO";
+          if (!this.victoryPlayed) {
+            playVictoryJingle();
+            this.victoryPlayed = true;
+          }
+        }
+
+        if (keys['s'] && this.player1Y > 0) this.player1Y -= this.speed;
+        if (keys['x'] && this.player1Y < HEIGHT - this.playerHeight) this.player1Y += this.speed;
+        if (keys['arrowup'] && this.player2Y > 0) this.player2Y -= this.speed;
+        if (keys['arrowdown'] && this.player2Y < HEIGHT - this.playerHeight) this.player2Y += this.speed;
+      }
+      collision(a, b) {
+        return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+      }
+      drawScoreboard() {
+        const s1 = this.scoreP1.toString();
+        const s2 = this.scoreP2.toString();
+        ctx.font = SCORE_FONT;
+        ctx.fillStyle = WHITE;
+        const w1 = ctx.measureText(s1).width;
+        const w2 = ctx.measureText(s2).width;
+        const colon = ctx.measureText(":").width;
+        const total = w1 + colon + w2 + 40;
+        const startX = (WIDTH - total) / 2;
+        ctx.fillText(s1, startX, 80);
+        ctx.fillText(":", startX + w1 + 20, 80);
+        ctx.fillText(s2, startX + w1 + 20 + colon + 20, 80);
+
+        ctx.font = '16px monospace';
+        ctx.fillStyle = GREEN;
+        ctx.fillText("VERDE", startX + (w1 - 40) / 2, 20);
+        ctx.fillStyle = WHITE;
+        ctx.fillText("BIANCO", startX + w1 + 20 + colon + 20 + (w2 - 50) / 2, 20);
+      }
+      handleInput() {
+        document.addEventListener('keydown', (e) => {
+          if (e.key.toLowerCase() === 'g' && this.waitingStart) {
+            this.starter = Math.random() > 0.5 ? 'p1' : 'p2';
+            this.showStarterMsg = true;
+            this.waitingStart = false;
+            setTimeout(() => this.showStarterMsg = false, 2000);
+          }
+          if (e.key.toLowerCase() === 'p' && !this.waitingStart) {
+            this.paused = !this.paused;
+          }
+          if (e.key === 'Escape') this.running = false;
+        }, { once: false });
+      }
+    }
+
+    // ================== PELOTA ==================
+    class Pelota extends Game {
+      constructor() {
+        super();
+        this.baseSpeed = 5;
+        this.ball = { x: WIDTH / 2, y: HEIGHT / 2, speedX: -this.baseSpeed, speedY: 5 };
+        this.paddleWidth = 10;
+        this.paddleHeight = 66;
+        this.speed = 7;
+        this.paddleY = HEIGHT / 2 - this.paddleHeight / 2;
+        this.level = 1;
+        this.maxLevel = 6;
+        this.currentScore = 0;
+        this.bestScore = 0;
+        this.hits = 0;
+        this.waitingStart = true;
+        this.paused = false;
+        this.applySpeedFromLevel(false);
+      }
+      updateMultiplier() {
+        return 1.0 + 0.2 * (this.level - 1);
+      }
+      applySpeedFromLevel(preserve) {
+        const mag = this.baseSpeed * this.updateMultiplier();
+        if (preserve) {
+          this.ball.speedX = (this.ball.speedX < 0 ? -1 : 1) * mag;
+          this.ball.speedY = (this.ball.speedY < 0 ? -1 : 1) * mag;
+        } else {
+          this.ball.speedX = -mag;
+          this.ball.speedY = Math.random() > 0.5 ? mag : -mag;
+        }
+      }
+      reset() {
+        this.ball.x = WIDTH / 2;
+        this.ball.y = HEIGHT / 2;
+        this.applySpeedFromLevel(false);
+        this.hits = 0;
+      }
+      drawBrickWall() {
+        const bw = 20, bh = 12, ww = 40;
+        for (let row = 0; row < HEIGHT; row += bh) {
+          const offset = (row / bh) % 2 === 1 ? bw / 2 : 0;
+          for (let x = -offset; x < ww; x += bw) {
+            if (x >= 0 && x + bw <= ww) {
+              ctx.strokeStyle = WHITE;
+              ctx.lineWidth = 2;
+              ctx.strokeRect(x, row, bw, bh);
+            }
+          }
+        }
+      }
+      draw() {
+        ctx.fillStyle = BLACK;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        ctx.strokeStyle = WHITE;
+        ctx.lineWidth = 2;
+        for (let x = 0; x < WIDTH; x += 20) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 10, 0); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x, HEIGHT); ctx.lineTo(x + 10, HEIGHT); ctx.stroke();
+        }
+        for (let y = 0; y < HEIGHT; y += 20) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(0, y + 10); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(WIDTH, y); ctx.lineTo(WIDTH, y + 10); ctx.stroke();
+        }
+        this.drawBrickWall();
+        ctx.fillStyle = WHITE;
+        ctx.fillRect(WIDTH - 30 - this.paddleWidth, this.paddleY, this.paddleWidth, this.paddleHeight);
+        ctx.beginPath();
+        ctx.arc(this.ball.x, this.ball.y, 10, 0, Math.PI * 2);
+        ctx.fill();
+        this.drawSingleScoreboard();
+        ctx.font = FONT;
+        ctx.fillStyle = GREEN;
+        ctx.fillText(`HITS: ${this.hits}   VEL: ${this.updateMultiplier().toFixed(2)}x   LIV: ${this.level}`, 10, HEIGHT - 10);
+        if (this.waitingStart) {
+          ctx.fillStyle = YELLOW;
+          ctx.fillText("Premere G per iniziare gioco", WIDTH / 2 - 120, 90);
+          ctx.fillStyle = ORANGE;
+          ctx.fillText("Premere P per pausa gioco e ripremere P per continuare", WIDTH / 2 - 220, 120);
+        }
+        if (this.paused) {
+          ctx.fillStyle = ORANGE;
+          ctx.fillText("GIOCO IN PAUSA", WIDTH / 2 - 70, HEIGHT / 2);
+          ctx.fillStyle = WHITE;
+          ctx.fillText("Premere P per riprendere", WIDTH / 2 - 100, HEIGHT / 2 + 30);
+        }
+      }
+      update() {
+        if (this.waitingStart || this.paused) return;
+
+        this.ball.x += this.ball.speedX;
+        this.ball.y += this.ball.speedY;
+
+        if (this.ball.y <= 0 || this.ball.y >= HEIGHT) {
+          this.ball.speedY *= -1;
+          playWallBounce();
+        }
+
+        if (this.ball.x <= 40) {
+          this.ball.speedX = Math.abs(this.ball.speedX);
+          this.applySpeedFromLevel(true);
+          playWallBounce();
+        }
+
+        if (this.ball.x >= WIDTH - 50 - this.paddleWidth &&
+            this.paddleY <= this.ball.y &&
+            this.ball.y <= this.paddleY + this.paddleHeight) {
+          this.ball.speedX = -Math.abs(this.ball.speedX);
+          this.applySpeedFromLevel(true);
+          this.hits++;
+          this.currentScore++;
+          if (this.currentScore > this.bestScore) this.bestScore = this.currentScore;
+          if (this.currentScore % 10 === 0 && this.level < this.maxLevel) {
+            this.level++;
+            this.applySpeedFromLevel(true);
+          }
+          playPaddleHit();
+        }
+
+        if (this.ball.x > WIDTH) {
+          this.currentScore = 0;
+          this.hits = 0;
+          this.level = 1;
+          playPointScore();
+          this.reset();
+        }
+
+        if (keys['arrowup'] && this.paddleY > 0) this.paddleY -= this.speed;
+        if (keys['arrowdown'] && this.paddleY < HEIGHT - this.paddleHeight) this.paddleY += this.speed;
+      }
+      handleInput() {
+        document.addEventListener('keydown', (e) => {
+          if (e.key.toLowerCase() === 'g' && this.waitingStart) {
+            this.waitingStart = false;
+          }
+          if (e.key.toLowerCase() === 'p' && !this.waitingStart) {
+            this.paused = !this.paused;
+          }
+          if (e.key === 'Escape') this.running = false;
+        }, { once: false });
+      }
+      drawSingleScoreboard() {
+        ctx.font = FONT;
+        ctx.fillStyle = WHITE;
+        const label = ctx.measureText("BIANCO");
+        ctx.fillText("BIANCO", (WIDTH - label.width) / 2, 20);
+        ctx.font = SCORE_FONT;
+        const score = ctx.measureText(this.currentScore);
+        ctx.fillText(this.currentScore, (WIDTH - score.width) / 2, 100);
+        ctx.font = FONT;
+        const best = ctx.measureText(`BEST: ${this.bestScore}`);
+        ctx.fillStyle = YELLOW;
+        ctx.fillText(`BEST: ${this.bestScore}`, WIDTH - best.width - 10, 10);
+        const level = ctx.measureText(`Livello=${this.level}`);
+        ctx.fillText(`Livello=${this.level}`, WIDTH - level.width - 10, 30);
+      }
+    }
+
+    // ================== SQUASH ==================
+    class Squash extends Game {
+      constructor() {
+        super();
+        this.paddleWidth = 10;
+        this.paddleHeight = 66;
+        this.speed = 7;
+        this.paddleGreenY = HEIGHT / 2 - this.paddleHeight / 2;
+        this.paddleWhiteY = HEIGHT / 2 - this.paddleHeight / 2;
+        this.ball = { x: 30 + this.paddleWidth + 10, y: HEIGHT / 2, speedX: 5, speedY: 5 };
+        this.lastHitter = null;
+        this.gameOver = false;
+        this.winner = null;
+        this.victoryPlayed = false;
+        this.ballSpeedMultiplier = 1.0;
+        this.waitingStart = true;
+        this.paused = false;
+        this.starter = Math.random() > 0.5 ? "VERDE" : "BIANCO";
+        this.reset();
+      }
+      reset() {
+        const mag = 5 * this.ballSpeedMultiplier;
+        this.ball.speedX = mag;
+        this.ball.speedY = Math.random() > 0.5 ? mag : -mag;
+        this.ball.x = 30 + this.paddleWidth + 10;
+        this.ball.y = HEIGHT / 2;
+        this.lastHitter = null;
+      }
+      draw() {
+        ctx.fillStyle = BLACK;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        ctx.strokeStyle = WHITE;
+        ctx.lineWidth = 2;
+        for (let x = 0; x < WIDTH; x += 20) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 10, 0); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x, HEIGHT); ctx.lineTo(x + 10, HEIGHT); ctx.stroke();
+        }
+        for (let y = 0; y < HEIGHT; y += 20) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(0, y + 10); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(WIDTH, y); ctx.lineTo(WIDTH, y + 10); ctx.stroke();
+        }
+        ctx.strokeRect(0, 0, WIDTH, HEIGHT);
+        ctx.fillStyle = GREEN;
+        ctx.fillRect(WIDTH - 52 - this.paddleWidth, this.paddleGreenY, this.paddleWidth, this.paddleHeight);
+        ctx.fillStyle = WHITE;
+        ctx.fillRect(WIDTH - 28 - this.paddleWidth, this.paddleWhiteY, this.paddleWidth, this.paddleHeight);
+        if (!this.gameOver && !this.waitingStart && !this.paused) {
+          ctx.fillStyle = WHITE;
+          ctx.beginPath();
+          ctx.arc(this.ball.x, this.ball.y, 10, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        this.drawScoreboard();
+        const maxScore = Math.max(this.scoreP1, this.scoreP2);
+        const level = Math.max(1, Math.floor(maxScore / 10) + 1);
+        ctx.font = FONT;
+        ctx.fillStyle = YELLOW;
+        ctx.fillText(`LIV: ${level}`, WIDTH - 100, 10);
+        if (!this.waitingStart) {
+          const tocca = this.lastHitter === 'p1' ? 'VERDE' : this.lastHitter === 'p2' ? 'BIANCO' : this.starter;
+          const col = tocca === 'VERDE' ? GREEN : WHITE;
+          ctx.fillStyle = col;
+          const msg = ctx.measureText(`Tocca al giocatore: ${tocca}`);
+          ctx.fillText(`Tocca al giocatore: ${tocca}`, (WIDTH - msg.width) / 2, 110);
+        }
+        if (this.waitingStart) {
+          ctx.fillStyle = YELLOW;
+          ctx.fillText("Premere G per iniziare gioco", WIDTH / 2 - 120, 90);
+          ctx.fillStyle = ORANGE;
+          ctx.fillText("Premere P per pausa gioco e ripremere P per continuare", WIDTH / 2 - 220, 120);
+          const starterMsg = ctx.measureText(`Il giocatore che inizia è: ${this.starter}`);
+          ctx.fillStyle = this.starter === "VERDE" ? GREEN : WHITE;
+          ctx.fillText(`Il giocatore che inizia è: ${this.starter}`, (WIDTH - starterMsg.width) / 2, 150);
+        }
+        if (this.paused) {
+          ctx.fillStyle = ORANGE;
+          ctx.fillText("GIOCO IN PAUSA", WIDTH / 2 - 70, HEIGHT / 2);
+          ctx.fillStyle = WHITE;
+          ctx.fillText("Premere P per riprendere", WIDTH / 2 - 100, HEIGHT / 2 + 30);
+        }
+        if (this.gameOver) {
+          const elapsed = (Date.now() - this.victoryTime) / 1000;
+          const scale = 1 + 0.2 * Math.sin(elapsed * 8);
+          const blink = Math.floor(elapsed * 5) % 2 === 0;
+          ctx.font = VICTORY_FONT;
+          ctx.fillStyle = blink ? (this.winner === "VERDE" ? GREEN : WHITE) : YELLOW;
+          const win = ctx.measureText("VITTORIA:");
+          ctx.fillText("VITTORIA:", (WIDTH - win.width) / 2, HEIGHT / 2 - 60);
+          ctx.fillStyle = this.winner === "VERDE" ? GREEN : WHITE;
+          const player = ctx.measureText(this.winner);
+          ctx.fillText(this.winner, (WIDTH - player.width) / 2, HEIGHT / 2 + 20);
+          ctx.font = FONT;
+          const cont = ctx.measureText("ESC per uscire");
+          ctx.fillStyle = WHITE;
+          ctx.fillText("ESC per uscire", (WIDTH - cont.width) / 2, HEIGHT / 2 + 100);
+        }
+      }
+      update() {
+        if (this.gameOver || this.waitingStart || this.paused) return;
+
+        this.ball.x += this.ball.speedX;
+        this.ball.y += this.ball.speedY;
+
+        if (this.ball.y <= 0 || this.ball.y >= HEIGHT) {
+          this.ball.speedY *= -1;
+          playWallBounce();
+        }
+        if (this.ball.x <= 0) {
+          this.ball.speedX *= -1;
+          playWallBounce();
+        }
+
+        if (this.ball.x > WIDTH) {
+          if (this.lastHitter === 'p1') this.scoreP2++;
+          else if (this.lastHitter === 'p2') this.scoreP1++;
+          playPointScore();
+          this.ballSpeedMultiplier *= 1.15;
+          this.reset();
+          if (this.scoreP1 >= 100) {
+            this.gameOver = true;
+            this.winner = "BIANCO";
+            this.victoryTime = Date.now();
+            if (!this.victoryPlayed) { playVictoryJingle(); this.victoryPlayed = true; }
+          } else if (this.scoreP2 >= 100) {
+            this.gameOver = true;
+            this.winner = "VERDE";
+            this.victoryTime = Date.now();
+            if (!this.victoryPlayed) { playVictoryJingle(); this.victoryPlayed = true; }
+          }
+          return;
+        }
+
+        const greenRect = { x: WIDTH - 50 - this.paddleWidth, y: this.paddleGreenY, w: this.paddleWidth, h: this.paddleHeight };
+        const whiteRect = { x: WIDTH - 30 - this.paddleWidth, y: this.paddleWhiteY, w: this.paddleWidth, h: this.paddleHeight };
+        const ballRect = { x: this.ball.x - 10, y: this.ball.y - 10, w: 20, h: 20 };
+
+        const calcAngle = (paddle) => {
+          const hitPos = (this.ball.y - (paddle.y + paddle.h / 2)) / (paddle.h / 2);
+          return hitPos * Math.abs(this.ball.speedX) * 1.5;
+        };
+
+        if (this.collision(whiteRect, ballRect) && this.ball.speedX > 0) {
+          if (this.lastHitter === 'p1') {
+            this.scoreP2++;
+            playPointScore();
+            this.ballSpeedMultiplier *= 1.15;
+            this.reset();
+            if (this.scoreP2 >= 100) {
+              this.gameOver = true;
+              this.winner = "VERDE";
+              this.victoryTime = Date.now();
+              if (!this.victoryPlayed) { playVictoryJingle(); this.victoryPlayed = true; }
+            }
+            return;
+          }
+          this.ball.speedX *= -1.1;
+          this.ball.speedY = calcAngle(whiteRect);
+          this.ball.x = whiteRect.x - 10;
+          playPaddleHit();
+          this.lastHitter = 'p1';
+        }
+
+        if (this.collision(greenRect, ballRect) && this.ball.speedX > 0) {
+          if (this.lastHitter === 'p2') {
+            this.scoreP1++;
+            playPointScore();
+            this.ballSpeedMultiplier *= 1.15;
+            this.reset();
+            if (this.scoreP1 >= 100) {
+              this.gameOver = true;
+              this.winner = "BIANCO";
+              this.victoryTime = Date.now();
+              if (!this.victoryPlayed) { playVictoryJingle(); this.victoryPlayed = true; }
+            }
+            return;
+          }
+          this.ball.speedX *= -1.1;
+          this.ball.speedY = calcAngle(greenRect);
+          this.ball.x = greenRect.x - 10;
+          playPaddleHit();
+          this.lastHitter = 'p2';
+        }
+
+        if (keys['s'] && this.paddleGreenY > 0) this.paddleGreenY -= this.speed;
+        if (keys['x'] && this.paddleGreenY < HEIGHT - this.paddleHeight) this.paddleGreenY += this.speed;
+        if (keys['arrowup'] && this.paddleWhiteY > 0) this.paddleWhiteY -= this.speed;
+        if (keys['arrowdown'] && this.paddleWhiteY < HEIGHT - this.paddleHeight) this.paddleWhiteY += this.speed;
+      }
+      handleInput() {
+        document.addEventListener('keydown', (e) => {
+          if (e.key.toLowerCase() === 'g' && this.waitingStart) {
+            this.waitingStart = false;
+          }
+          if (e.key.toLowerCase() === 'p' && !this.waitingStart) {
+            this.paused = !this.paused;
+          }
+          if (e.key === 'Escape') this.running = false;
+        }, { once: false });
+      }
+      collision(a, b) {
+        return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+      }
+      drawScoreboard() {
+        const s1 = this.scoreP1.toString();
+        const s2 = this.scoreP2.toString();
+        ctx.font = SCORE_FONT;
+        ctx.fillStyle = WHITE;
+        const w1 = ctx.measureText(s1).width;
+        const w2 = ctx.measureText(s2).width;
+        const colon = ctx.measureText(":").width;
+        const total = w1 + colon + w2 + 40;
+        const startX = (WIDTH - total) / 2;
+        ctx.fillText(s1, startX, 80);
+        ctx.fillText(":", startX + w1 + 20, 80);
+        ctx.fillText(s2, startX + w1 + 20 + colon + 20, 80);
+
+        ctx.font = '16px monospace';
+        ctx.fillStyle = GREEN;
+        ctx.fillText("VERDE", startX + (w1 - 40) / 2, 20);
+        ctx.fillStyle = WHITE;
+        ctx.fillText("BIANCO", startX + w1 + 20 + colon + 20 + (w2 - 50) / 2, 20);
+      }
+    }
+
+    // ================== MENU ==================
     function showMenu() {
       ctx.fillStyle = BLACK;
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
@@ -359,17 +995,36 @@
       });
     }
 
+    // Avvio
+    showMenu();
+    document.addEventListener('keydown', function(e) {
+      if (e.key === '1') {
+        const game = new Tennis();
+        game.run();
+      } else if (e.key === '2') {
+        const game = new Soccer();
+        game.run();
+      } else if (e.key === '3') {
+        const game = new Pelota();
+        game.run();
+      } else if (e.key === '4') {
+        const game = new Squash();
+        game.run();
+      } else if (e.key === 'Escape') {
+        showMenu();
+      }
+    });
+
     // Boot sequence
-    function bootSequence() {
+    setTimeout(() => {
       ctx.fillStyle = BLACK;
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
-      ctx.font = '40px monospace';
       ctx.fillStyle = GREEN;
+      ctx.font = '40px monospace';
       ctx.fillText("REEL C", WIDTH / 2 - 80, HEIGHT / 2 - 40);
       ctx.fillText("1978", WIDTH / 2 - 50, HEIGHT / 2);
       ctx.font = '20px monospace';
       ctx.fillText("LOADING...", WIDTH / 2 - 70, HEIGHT / 2 + 40);
-      playPointScore();
       setTimeout(() => {
         ctx.fillStyle = BLACK;
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
@@ -377,21 +1032,7 @@
         ctx.fillText("READY TO PLAY", WIDTH / 2 - 100, HEIGHT / 2);
         playPaddleHit();
       }, 1500);
-    }
-
-    // Avvio
-    bootSequence();
-    setTimeout(() => {
-      showMenu();
-      document.addEventListener('keydown', function(e) {
-        if (e.key === '1') {
-          const game = new Tennis();
-          game.run();
-        } else if (e.key === 'Escape') {
-          showMenu();
-        }
-      });
-    }, 2000);
+    }, 500);
   </script>
 </body>
 </html>
