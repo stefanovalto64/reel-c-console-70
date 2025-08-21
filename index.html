@@ -1,188 +1,32 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>REEL C - Console Anni '70 by Geppetto 64</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #000;
-            color: #fff;
-            font-family: 'Courier New', monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            overflow: hidden;
-        }
-        
-        #game-container {
-            position: relative;
-            width: 100%;
-            max-width: 640px;
-            margin: 0 auto;
-        }
-        
-        canvas {
-            display: block;
-            margin: 0 auto;
-            border: 2px solid #0f0;
-            box-shadow: 0 0 20px #0f0;
-        }
-        
-        #loading {
-            text-align: center;
-            color: #0f0;
-            font-size: 24px;
-            margin-top: 20px;
-        }
-        
-        #instructions {
-            margin-top: 20px;
-            padding: 15px;
-            border: 1px solid #0f0;
-            background-color: #111;
-            max-width: 640px;
-            text-align: center;
-        }
-        
-        h1 {
-            color: #0f0;
-            text-align: center;
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-        
-        h2 {
-            color: #0f0;
-            font-size: 20px;
-            margin-top: 15px;
-            margin-bottom: 10px;
-        }
-        
-        .controls {
-            display: flex;
-            justify-content: space-around;
-            margin: 10px 0;
-        }
-        
-        .player {
-            text-align: center;
-            padding: 10px;
-            border: 1px solid #0f0;
-            border-radius: 5px;
-            width: 45%;
-        }
-        
-        .player-1 {
-            color: #0f0;
-        }
-        
-        .player-2 {
-            color: #fff;
-        }
-        
-        .key {
-            display: inline-block;
-            padding: 5px 10px;
-            margin: 5px;
-            background-color: #333;
-            border: 1px solid #0f0;
-            border-radius: 3px;
-            font-weight: bold;
-        }
-        
-        .scanlines {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            background: linear-gradient(
-                to bottom,
-                rgba(0, 0, 0, 0.1) 50%,
-                rgba(0, 0, 0, 0.2) 50%
-            );
-            background-size: 100% 4px;
-            z-index: 10;
-        }
-        
-        .crt-effect {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            background: radial-gradient(
-                ellipse at center,
-                rgba(0, 0, 0, 0) 0%,
-                rgba(0, 0, 0, 0.2) 100%
-            );
-            z-index: 11;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>REEL C - Console Anni '70</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <h1>REEL C - Console Anni '70</h1>
-    
-    <div id="game-container">
-        <canvas id="canvas" width="640" height="480"></canvas>
-        <div class="scanlines"></div>
-        <div class="crt-effect"></div>
-    </div>
-    
-    <div id="loading">Caricamento in corso...</div>
-    
-    <div id="instructions">
-        <h2>Istruzioni</h2>
-        <p>Seleziona un gioco dal menu principale:</p>
-        <ul style="text-align: left; display: inline-block;">
-            <li>1 - Tennis</li>
-            <li>2 - Calcio</li>
-            <li>3 - Pelota</li>
-            <li>4 - Squash</li>
-        </ul>
-        
-        <div class="controls">
-            <div class="player player-1">
-                <h3>Giocatore VERDE</h3>
-                <p>Muovi: <span class="key">S</span> (su) <span class="key">X</span> (giù)</p>
-            </div>
-            
-            <div class="player player-2">
-                <h3>Giocatore BIANCO</h3>
-                <p>Muovi: <span class="key">↑</span> (su) <span class="key">↓</span> (giù)</p>
-            </div>
-        </div>
-        
-        <p>Premi <span class="key">G</span> per iniziare il gioco</p>
-        <p>Premi <span class="key">P</span> per mettere in pausa</p>
-        <p>Premi <span class="key">ESC</span> per uscire</p>
-    </div>
+  <div id="container">
+    <canvas id="gameCanvas" width="640" height="480"></canvas>
+  </div>
 
-    <!-- Pygbag loader -->
-    <script type="module">
-        // Caricamento e inizializzazione di Pygbag
-        import { Runtime } from "https://pygbag.pythonanywhere.com/assets/pygbag.js";
-        
-        const loadingElement = document.getElementById("loading");
-        const runtime = new Runtime();
-        
-        runtime.addEventListener("progress", (event) => {
-            const percent = event.detail * 100;
-            loadingElement.textContent = `Caricamento... ${percent.toFixed(1)}%`;
-        });
-        
-        runtime.addEventListener("ready", () => {
-            loadingElement.style.display = "none";
-        });
-        
-        runtime.start("reel_c_console.py");
-    </script>
+  <div id="menu" class="screen">
+    <h1>REEL C - CONSOLE 1978</h1>
+    <p>Seleziona un gioco:</p>
+    <button onclick="startGame('tennis')">1. TENNIS</button>
+    <button onclick="startGame('calcio')">2. CALCIO</button>
+    <button onclick="startGame('pelota')">3. PELOTA</button>
+    <button onclick="startGame('squash')">4. SQUASH</button>
+    <p>Risoluzione: 
+      <select id="resolution" onchange="changeResolution()">
+        <option value="1">Base (640x480)</option>
+        <option value="1.6">+60%</option>
+        <option value="2">Fullscreen (98%)</option>
+      </select>
+    </p>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
